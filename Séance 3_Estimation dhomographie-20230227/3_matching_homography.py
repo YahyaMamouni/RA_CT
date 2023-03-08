@@ -2,12 +2,17 @@ import numpy as np
 import cv2
 
 
-#cap = cv2.VideoCapture('isima1.mp4')
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture('isima1.mp4')
+#cap = cv2.VideoCapture(0)
 
 # Load reference image
-#imgref = cv2.imread('ref_isima.jpg')
-imgref = cv2.imread("images/test.jpg")
+imgref = cv2.imread('ref_isima.jpg')
+#imgref = cv2.imread("images/test.jpg")
+
+
+# Load logo image
+logo = cv2.imread('INP_texte.png', cv2.IMREAD_UNCHANGED)
+
 
 # Create Detector and descriptor, sift par exemple
 detector = cv2.ORB_create(nfeatures=300)
@@ -68,10 +73,29 @@ while(True):
     
     # Matching results
     imgmatching = cv2.drawMatches(imgref,kp_ref,frame,kp_cur,matches[0:n_matchs],None,flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+    
+    # Add logo to frame
+    logo_resized = cv2.resize(logo, (cur_rect[2][0][0], cur_rect[2][0][1]))
+    alpha_channel = logo[:, :, 3] / 255.0
+    logo_image = logo_resized[:, :, 0:3]
+    cur_rect_int = cur_rect.astype(int)
+    bg_roi = frame[cur_rect_int[0][0][1]:cur_rect_int[2][0][1], cur_rect_int[0][0][0]:cur_rect_int[2][0][0]]
+    bg_roi = bg_roi.astype(float)
+    
+    # Apply the alpha channel
+    alpha_channel = cv2.resize(alpha_channel, (bg_roi.shape[1], bg_roi.shape[0]))
+    alpha_channel = np.stack([alpha_channel, alpha_channel, alpha_channel], axis=2)
+    logo_image = cv2.multiply(alpha_channel, logo_image.astype(float))
+    
+    # Apply the logo
+    bg_roi = cv2.multiply(1.0 - alpha_channel, bg_roi)
+    bg_roi = cv2.add(bg_roi, logo_image.astype(float))
+    bg_roi = bg_roi.astype(np.uint8)
+    frame[cur_rect[0][0][1]:cur_rect[2][0][1], cur_rect[0][0][0]:cur_rect[2][0][0]] = bg_roi
 
     # Display the resulting frame
     cv2.imshow('ref image',imgref)
-    cv2.imshow('color frame',frame)
+    #cv2.imshow('color frame',frame)
     cv2.imshow('Matching result',imgmatching)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
